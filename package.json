@@ -12,6 +12,11 @@
   "author": "Robert",
   "license": "",
   "devDependencies": {
-    "@openzeppelin/contracts": "^4.6.0"
+    "@openzeppelin/contracts": "^4.6.0",
+    "truffle-plugin-verify": "^0.5.25"
+  },
+  "dependencies": {
+    "@truffle/hdwallet-provider": "^2.0.8",
+    "fs": "^0.0.1-security"
   }
 }

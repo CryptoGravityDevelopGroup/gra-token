@@ -323,3 +323,5 @@ lint/tmp/
 *.hprof
 
 .idea/
+.secret
+contracts/artifacts/

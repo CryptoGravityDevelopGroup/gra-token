@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
+// @examle https://ropsten.etherscan.io/address/0xE3CeA92f11801cd617e851cB41607dD4d299E707#code
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract TimeVesting {
+contract TokenTimeVesting {
     using SafeMath for uint256;
     using SafeMath for uint16;
 
@@ -59,20 +60,22 @@ contract TimeVesting {
     external
     onlyOwner
     {
+        uint256 _tokenAmount = _amount * (10 ** 18);
+
         require(_vestingCliffInDays <= 10 * 365, "more than 10 years");
         require(_vestingDurationInDays <= 25 * 365, "more than 25 years");
         require(_vestingDurationInDays >= _vestingCliffInDays, "Duration < Cliff");
 
-        uint256 amountVestedPerDay = _amount.div(_vestingDurationInDays);
+        uint256 amountVestedPerDay = _tokenAmount.div(_vestingDurationInDays);
         require(amountVestedPerDay > 0, "amountVestedPerDay > 0");
 
         // Transfer the grant tokens under the control of the vesting contract
         // 将token从owner地址转移到锁仓单地址
-        require(token.transferFrom(owner, address(this), _amount), "transfer failed");
+        require(token.transferFrom(owner, address(this), _tokenAmount), "transfer failed");
 
         Grant memory grant = Grant({
         startTime : _startTime == 0 ? currentTime() : _startTime,
-        amount : _amount,
+        amount : _tokenAmount,
         vestingDuration : _vestingDurationInDays,
         vestingCliff : _vestingCliffInDays,
         daysClaimed : 0,

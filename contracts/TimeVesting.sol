@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-contract VestingVault12 {
+contract TimeVesting {
     using SafeMath for uint256;
     using SafeMath for uint16;
 
@@ -26,14 +26,15 @@ contract VestingVault12 {
 
     uint256 constant internal SECONDS_PER_DAY = 86400;
 
+    // 授予锁仓记录
     struct Grant {
-        uint256 startTime;
-        uint256 amount;
-        uint16 vestingDuration;
-        uint16 vestingCliff;
-        uint16 daysClaimed;
-        uint256 totalClaimed;
-        address recipient;
+        uint256 startTime; // 锁仓开始时间
+        uint256 amount; // 锁仓总额度
+        uint16 vestingDuration; // 归属期限
+        uint16 vestingCliff; // 锁仓开始解禁时间
+        uint16 daysClaimed; // 持有Token天数
+        uint256 totalClaimed; // 已经解锁的token
+        address recipient; // 授予人
     }
 
     event GrantAdded(address indexed recipient, uint256 vestingId);
@@ -66,6 +67,7 @@ contract VestingVault12 {
         require(amountVestedPerDay > 0, "amountVestedPerDay > 0");
 
         // Transfer the grant tokens under the control of the vesting contract
+        // 将token从owner地址转移到锁仓单地址
         require(token.transferFrom(owner, address(this), _amount), "transfer failed");
 
         Grant memory grant = Grant({
@@ -90,24 +92,34 @@ contract VestingVault12 {
     /// @notice Calculate the vested and unclaimed months and tokens available for `_grantId` to claim
     /// Due to rounding errors once grant duration is reached, returns the entire left grant amount
     /// Returns (0, 0) if cliff has not been reached
+    /// @notice 计算“授予ID”未释放的锁仓token数量和剩余的锁仓日
+    /// 一旦达到授权期限，返回整个剩余仓token数量
+    /// 返回 (0, 0) 如果cliff日未到
     function calculateGrantClaim(uint256 _grantId) public view returns (uint16, uint256) {
+        // 锁仓记录
         Grant storage tokenGrant = tokenGrants[_grantId];
 
         // For grants created with a future start date, that hasn't been reached, return 0, 0
+        // 授予锁仓开始时间大于当前时间，不能取出
         if (currentTime() < tokenGrant.startTime) {
             return (0, 0);
         }
 
         // Check cliff was reached
+        // 剩余时间 = 当前时间戳 - 锁仓开始时间
         uint elapsedTime = currentTime().sub(tokenGrant.startTime);
+        // 剩余天数 = 剩余秒数 / 86400 秒
         uint elapsedDays = elapsedTime.div(SECONDS_PER_DAY);
 
+        // 如果剩余天数 < 赠与的cliff日期，返回 (剩余天数, 0个token)
         if (elapsedDays < tokenGrant.vestingCliff) {
             return (uint16(elapsedDays), 0);
         }
 
         // If over vesting duration, all tokens vested
+        // 如果超过归属期限，所有的token都归属
         if (elapsedDays >= tokenGrant.vestingDuration) {
+            // 剩余的所有token
             uint256 remainingGrant = tokenGrant.amount.sub(tokenGrant.totalClaimed);
             return (tokenGrant.vestingDuration, remainingGrant);
         } else {
@@ -120,10 +132,13 @@ contract VestingVault12 {
 
     /// @notice Allows a grant recipient to claim their vested tokens. Errors if no tokens have vested
     /// It is advised recipients check they are entitled to claim via `calculateGrantClaim` before calling this
+    /// @notice 允许从授予ID中释放一笔锁仓token，如果无token可释放则报错
+    /// 建议被授予人调用前通过“calculateGrantClaim”函数检查他们是否有权解锁token
     function claimVestedTokens(uint256 _grantId) external {
         uint16 daysVested;
         uint256 amountVested;
         (daysVested, amountVested) = calculateGrantClaim(_grantId);
+        // 已无token可获取
         require(amountVested > 0, "amountVested is 0");
 
         Grant storage tokenGrant = tokenGrants[_grantId];
@@ -135,9 +150,11 @@ contract VestingVault12 {
     }
 
     /// @notice Terminate token grant transferring all vested tokens to the `_grantId`
-    /// and returning all non-vested tokens to the V12 owner
-    /// Secured to the V12 owner only
+    /// and returning all non-vested tokens to the owner
+    /// Secured to the owner only
     /// @param _grantId grantId of the token grant recipient
+    /// @notice 终止该Token锁仓单即转移所有释放的token到锁仓单中允许提现，转移锁仓中的token到owner
+    /// 只有Owner可以进行操作
     function removeTokenGrant(uint256 _grantId)
     external
     onlyOwner
@@ -168,6 +185,7 @@ contract VestingVault12 {
         return block.timestamp;
     }
 
+    // 每天释放的锁仓Token数量 = 锁仓单数量 / 归属期限
     function tokensVestedPerDay(uint256 _grantId) public view returns (uint256) {
         Grant storage tokenGrant = tokenGrants[_grantId];
         return tokenGrant.amount.div(uint256(tokenGrant.vestingDuration));

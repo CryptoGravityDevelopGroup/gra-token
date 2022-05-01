@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract GRA is ERC20 {
     constructor() ERC20("GRA BY CRYPTO GRAVITY", "GRA") {
+        // todo: 1. 是否加入增发token的函数
+        // todo: 2. 是否写死供应量
         _mint(msg.sender, 50000000 * 10 ** 18);
     }
 }
